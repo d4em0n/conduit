@@ -159,6 +159,10 @@ final class TerminalUploadFile {
 abstract interface class TerminalBrowserPlatformGateway {
   Future<TerminalUploadFile?> pickUploadFile();
   Future<void> saveDownload(TerminalDownloadedFile downloaded);
+  Future<void> openFile(
+    TerminalDownloadedFile downloaded, {
+    required bool Function() isCurrent,
+  });
 
   /// Shows [preview]; false when it could not be shown.
   Future<bool> openPort(TerminalPortPreview preview);

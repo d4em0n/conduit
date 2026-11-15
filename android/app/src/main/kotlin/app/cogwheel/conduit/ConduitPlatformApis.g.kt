@@ -5691,6 +5691,44 @@ interface ImageGalleryHostApi {
     }
   }
 }
+/**
+ * Opens an app-private downloaded document using the system app picker.
+ *
+ * Generated interface from Pigeon that represents a handler of messages from Flutter.
+ */
+interface NativeDocumentHostApi {
+  fun openFile(path: String, mimeType: String): Boolean
+
+  companion object {
+    /** The codec used by NativeDocumentHostApi. */
+    val codec: MessageCodec<Any?> by lazy {
+      ConduitPlatformApisPigeonCodec()
+    }
+    /** Sets up an instance of `NativeDocumentHostApi` to handle messages through the `binaryMessenger`. */
+    @JvmOverloads
+    fun setUp(binaryMessenger: BinaryMessenger, api: NativeDocumentHostApi?, messageChannelSuffix: String = "") {
+      val separatedMessageChannelSuffix = if (messageChannelSuffix.isNotEmpty()) ".$messageChannelSuffix" else ""
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.conduit.NativeDocumentHostApi.openFile$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { message, reply ->
+            val args = message as List<Any?>
+            val pathArg = args[0] as String
+            val mimeTypeArg = args[1] as String
+            val wrapped: List<Any?> = try {
+              listOf(api.openFile(pathArg, mimeTypeArg))
+            } catch (exception: Throwable) {
+              ConduitPlatformApisPigeonUtils.wrapError(exception)
+            }
+            reply.reply(wrapped)
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+    }
+  }
+}
 /** Generated interface from Pigeon that represents a handler of messages from Flutter. */
 interface NativeSheetHostApi {
   fun setTheme(theme: PlatformNativeSheetTheme)

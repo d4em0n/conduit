@@ -9448,5 +9448,7 @@
   "settingsAddAction": "Dodaj",
   "@settingsAddAction": {
     "description": "Read aloud for the plus button in a Settings page's bar that adds an item, such as a calendar event."
-  }
+  },
+  "openWith": "Otwórz za pomocą…",
+  "documentOpenFailed": "Nie można otworzyć pliku. Sprawdź, czy zainstalowano aplikację obsługującą ten typ pliku."
 }

@@ -5059,5 +5059,7 @@
   "settingsAddAction": "Añadir",
   "@settingsAddAction": {
     "description": "Read aloud for the plus button in a Settings page's bar that adds an item, such as a calendar event."
-  }
+  },
+  "openWith": "Abrir con…",
+  "documentOpenFailed": "No se pudo abrir el archivo. Comprueba que haya una aplicación compatible instalada."
 }

@@ -13,10 +13,11 @@ import 'package:conduit_core/services/api_service.dart';
 import 'enhanced_image_attachment.dart';
 import 'enhanced_video_attachment.dart';
 
-import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/platform/native_document_opener.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:conduit/shared/widgets/conduit_components.dart';
 
-import 'dart:io';
 import 'dart:convert';
 
 import 'package:conduit_core/services/worker_manager.dart';
@@ -45,7 +46,7 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
   Map<String, dynamic>? _fileInfo;
   bool _isLoading = true;
   String? _error;
-  String? _localFilePath;
+  bool _opening = false;
 
   @override
   void initState() {
@@ -125,54 +126,49 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
     return size is num ? size.toInt() : null;
   }
 
-  Future<String?> _ensureLocalFile() async {
-    if (_localFilePath != null && await File(_localFilePath!).exists()) {
-      return _localFilePath;
-    }
+  Future<void> _openFile() async {
+    if (_opening) return;
+    final api = ref.read(apiServiceProvider);
+    if (api is! ApiService) return;
+    final l10n = AppLocalizations.of(context)!;
+    final account = ref.read(openWebUiAuthSessionEpochProvider);
+    final attachmentId = widget.attachmentId;
+    final auth = api.captureAuthSnapshot();
+    bool current() =>
+        mounted &&
+        widget.attachmentId == attachmentId &&
+        identical(ref.read(apiServiceProvider), api) &&
+        ref.read(openWebUiAuthSessionEpochProvider) == account;
+    setState(() => _opening = true);
     try {
-      final api = ref.read(apiServiceProvider);
-      if (api is! ApiService) return null;
-
-      final content = await api.getFileContent(widget.attachmentId);
+      final content = await api.getFileContent(
+        attachmentId,
+        authSnapshot: auth,
+        maxBytes: 64 * 1024 * 1024,
+      );
+      if (!current()) return;
+      final worker = ref.read(workerManagerProvider);
+      final bytes = await worker.schedule<String, Uint8List>(
+        _decodeAttachmentBase64,
+        content,
+        debugLabel: 'attachment_decode_bytes',
+      );
+      if (!current()) return;
       final filename = (_fileInfo?['filename'] ?? _fileInfo?['name'] ?? 'file')
           .toString();
-      final dir = await getTemporaryDirectory();
-      final filePath = '${dir.path}/$filename';
-
-      final worker = ref.read(workerManagerProvider);
-      try {
-        if (_looksLikeBase64(content)) {
-          final bytes = await worker.schedule<String, Uint8List>(
-            _decodeAttachmentBase64,
-            content,
-            debugLabel: 'attachment_decode_bytes',
-          );
-          await File(filePath).writeAsBytes(bytes, flush: true);
-        } else {
-          await File(filePath).writeAsString(content, flush: true);
-        }
-      } catch (_) {
-        await File(filePath).writeAsString(content, flush: true);
+      await openDownloadedDocument(
+        bytes,
+        filename,
+        _contentTypeOf(_fileInfo) ?? 'application/octet-stream',
+        isCurrent: current,
+      );
+    } catch (_) {
+      if (mounted && current()) {
+        AdaptiveSnackBar.show(context, message: l10n.documentOpenFailed);
       }
-
-      _localFilePath = filePath;
-      return _localFilePath;
-    } catch (e) {
-      setState(() {
-        _error = 'Failed to prepare file';
-      });
-      return null;
+    } finally {
+      if (mounted) setState(() => _opening = false);
     }
-  }
-
-  Future<void> _shareFile() async {
-    final path = await _ensureLocalFile();
-    if (path == null) return;
-    final filename = (_fileInfo?['filename'] ?? _fileInfo?['name'] ?? 'file')
-        .toString();
-    await SharePlus.instance.share(
-      ShareParams(files: [XFile(path, name: filename)]),
-    );
   }
 
   String _fileIconFor(String filename) {
@@ -349,6 +345,11 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
               ],
             ),
           ),
+          const SizedBox(width: Spacing.xs),
+          ConduitTextButton(
+            text: AppLocalizations.of(context)!.openWith,
+            onPressed: _opening ? null : _openFile,
+          ),
         ],
       ),
     );
@@ -357,10 +358,12 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
       button: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () async {
-          await ConduitHaptics.mediumImpact();
-          await _shareFile();
-        },
+        onTap: _opening
+            ? null
+            : () async {
+                await ConduitHaptics.mediumImpact();
+                await _openFile();
+              },
         child: card,
       ),
     );
@@ -378,13 +381,10 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
   }
 }
 
-bool _looksLikeBase64(String content) {
-  if (content.length <= 128) return false;
-  final sanitized = content.replaceAll('\n', '');
-  return RegExp(r'^[A-Za-z0-9+/=]+$').hasMatch(sanitized);
-}
-
 Uint8List _decodeAttachmentBase64(String raw) {
-  final sanitized = raw.replaceAll('\n', '');
+  final encoded = raw.startsWith('data:')
+      ? raw.substring(raw.indexOf(',') + 1)
+      : raw;
+  final sanitized = encoded.replaceAll('\n', '');
   return base64Decode(sanitized);
 }

@@ -636,6 +636,7 @@ class MainActivity : FlutterFragmentActivity() {
         realtimeAudioBridge.setup(flutterEngine)
         imageGalleryBridge = ImageGalleryBridge(this)
         imageGalleryBridge.setup(flutterEngine)
+        NativeDocumentHostApi.setUp(flutterEngine.dartExecutor.binaryMessenger, NativeDocumentBridge(this))
         pushBridge = PushBridge(this)
         pushBridge.setup(flutterEngine)
         telecomCallBridge = TelecomCallBridge(this)

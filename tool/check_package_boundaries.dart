@@ -125,6 +125,7 @@ const List<String> _iosHostAgnosticSwift = <String>[
   'ios/Runner/ConduitCarPlaySceneDelegate.swift',
   'ios/Runner/ConduitPlatformApis.g.swift',
   'ios/Runner/CookieBridge.swift',
+  'ios/Runner/NativeDocumentBridge.swift',
   'ios/Runner/NativeDropdownBridge.swift',
   'ios/Runner/NativeImageViewerBridge.swift',
   'ios/Runner/NativeIosTtsBridge.swift',

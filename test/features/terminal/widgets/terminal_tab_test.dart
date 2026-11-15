@@ -101,6 +101,7 @@ void main() {
         {'path': '/report.txt'},
       );
       await tester.pumpAndSettle();
+      expect(find.text('Open with…'), findsOneWidget);
       expect(find.text('print("hello from terminal")'), findsOneWidget);
       await tester.pumpWidget(
         _buildHarnessWithContainer(container, showTab: false),

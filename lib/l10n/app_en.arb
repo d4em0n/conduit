@@ -11634,5 +11634,13 @@
   "settingsAddAction": "Add",
   "@settingsAddAction": {
     "description": "Read aloud for the plus button in a Settings page's bar that adds an item, such as a calendar event."
+  },
+  "openWith": "Open with…",
+  "@openWith": {
+    "description": "Action that fetches the current document and opens the system app picker."
+  },
+  "documentOpenFailed": "Could not open this file. Check that an app supporting this file type is installed.",
+  "@documentOpenFailed": {
+    "description": "Shown when a document cannot be fetched or opened in another app."
   }
 }

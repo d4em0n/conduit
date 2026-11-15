@@ -6979,5 +6979,7 @@
   "settingsAddAction": "Přidat",
   "@settingsAddAction": {
     "description": "Read aloud for the plus button in a Settings page's bar that adds an item, such as a calendar event."
-  }
+  },
+  "openWith": "Otevřít v…",
+  "documentOpenFailed": "Soubor se nepodařilo otevřít. Zkontrolujte, zda je nainstalována aplikace pro tento typ souboru."
 }

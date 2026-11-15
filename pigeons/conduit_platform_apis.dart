@@ -1323,6 +1323,12 @@ abstract class ImageGalleryHostApi {
   void saveImage(String path, String mimeType, String displayName);
 }
 
+/// Opens an app-private downloaded document using the system app picker.
+@HostApi()
+abstract class NativeDocumentHostApi {
+  bool openFile(String path, String mimeType);
+}
+
 @HostApi()
 abstract class NativeSheetHostApi {
   void setTheme(PlatformNativeSheetTheme theme);

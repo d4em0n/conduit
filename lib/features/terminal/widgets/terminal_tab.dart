@@ -189,6 +189,7 @@ class _TerminalTabState extends ConsumerState<TerminalTab>
       TerminalBrowserFailure.loadFiles => l10n.terminalFailedToLoadFiles,
       TerminalBrowserFailure.loadPorts => l10n.terminalFailedToLoadPorts,
       TerminalBrowserFailure.download => l10n.terminalDownloadFailed,
+      TerminalBrowserFailure.openFile => l10n.documentOpenFailed,
       TerminalBrowserFailure.rename => l10n.terminalRenameFailed,
       TerminalBrowserFailure.delete => l10n.terminalDeleteFailed,
       TerminalBrowserFailure.upload => l10n.terminalUploadFailed,

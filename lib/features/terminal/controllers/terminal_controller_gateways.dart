@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../platform/native_document_opener.dart';
 import '../../../platform/webview_cookie_helper.dart' show isWebViewSupported;
 import '../models/terminal_models.dart';
 
@@ -54,6 +55,17 @@ final class DefaultTerminalBrowserPlatformGateway
       bytes: downloaded.bytes,
     );
   }
+
+  @override
+  Future<void> openFile(
+    TerminalDownloadedFile downloaded, {
+    required bool Function() isCurrent,
+  }) => openDownloadedDocument(
+    downloaded.bytes,
+    downloaded.fileName,
+    downloaded.contentType,
+    isCurrent: isCurrent,
+  );
 
   @override
   Future<bool> openPort(TerminalPortPreview preview) {

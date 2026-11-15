@@ -6673,5 +6673,7 @@
   "settingsAddAction": "追加",
   "@settingsAddAction": {
     "description": "Read aloud for the plus button in a Settings page's bar that adds an item, such as a calendar event."
-  }
+  },
+  "openWith": "ほかのアプリで開く…",
+  "documentOpenFailed": "ファイルを開けませんでした。この形式に対応するアプリがインストールされているか確認してください。"
 }

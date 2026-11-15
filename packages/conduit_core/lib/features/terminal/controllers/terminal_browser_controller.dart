@@ -16,6 +16,7 @@ enum TerminalBrowserFailure {
   loadFiles,
   loadPorts,
   download,
+  openFile,
   rename,
   delete,
   upload,
@@ -414,11 +415,14 @@ class TerminalBrowserController with TerminalChangeNotifier {
 
   Future<void> downloadEntry(
     TerminalBrowserOperationContext operationContext,
-    TerminalFileEntry entry,
-  ) async {
+    TerminalFileEntry entry, {
+    bool openWith = false,
+  }) async {
     await _runMutation(
       operationContext,
-      failure: TerminalBrowserFailure.download,
+      failure: openWith
+          ? TerminalBrowserFailure.openFile
+          : TerminalBrowserFailure.download,
       reloadAfterward: false,
       mutate: () async {
         final downloaded = await operationContext.service.downloadFile(
@@ -427,7 +431,14 @@ class TerminalBrowserController with TerminalChangeNotifier {
           sessionScopeId: operationContext.sessionScopeId,
         );
         if (_isCurrentOperationContext(operationContext)) {
-          await _platformGateway.saveDownload(downloaded);
+          if (openWith) {
+            await _platformGateway.openFile(
+              downloaded,
+              isCurrent: () => _isCurrentOperationContext(operationContext),
+            );
+          } else {
+            await _platformGateway.saveDownload(downloaded);
+          }
         }
       },
     );

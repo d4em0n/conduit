@@ -196,8 +196,13 @@ final class TerminalCoordinator<S extends TerminalScreen>
 
   Future<void> downloadEntry(
     TerminalBrowserOperationContext operationContext,
-    TerminalFileEntry entry,
-  ) => _browserController.downloadEntry(operationContext, entry);
+    TerminalFileEntry entry, {
+    bool openWith = false,
+  }) => _browserController.downloadEntry(
+    operationContext,
+    entry,
+    openWith: openWith,
+  );
 
   Future<void> renameEntry(
     TerminalBrowserOperationContext operationContext,

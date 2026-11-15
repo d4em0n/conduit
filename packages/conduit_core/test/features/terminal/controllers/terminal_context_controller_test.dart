@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:checks/checks.dart';
 import 'package:conduit_core/features/terminal/controllers/terminal_browser_controller.dart';
@@ -27,6 +28,117 @@ void main() {
     kind: TerminalServerKind.direct,
     selectionId: 'manual:replacement',
     baseUrl: Uri.parse('https://replacement.test'),
+  );
+
+  const document = TerminalFileEntry(
+    name: 'report.docx',
+    path: '/workspace/report.docx',
+    isDirectory: false,
+  );
+
+  test(
+    'Open with fetches each revision instead of reusing preview bytes',
+    () async {
+      final service = _MockTerminalService();
+      final gateway = _FakeTerminalGateway(service: service)
+        ..selectedServer = server
+        ..currentPath = '/workspace/';
+      final harness = _TerminalControllerHarness(gateway);
+      addTearDown(harness.dispose);
+      var revision = 0;
+      when(
+        () => service.downloadFile(
+          server,
+          document.path,
+          sessionScopeId: 'scope',
+        ),
+      ).thenAnswer(
+        (_) async => TerminalDownloadedFile(
+          fileName: 'report.docx',
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          bytes: Uint8List.fromList([++revision]),
+        ),
+      );
+      for (var i = 0; i < 2; i++) {
+        await harness.browser.downloadEntry(
+          harness.browser.captureOperationContext()!,
+          document,
+          openWith: true,
+        );
+      }
+      check(harness.platform.openedFiles.map((file) => file.bytes.single))
+          .deepEquals([1, 2]);
+      check(harness.browserFailures).isEmpty();
+    },
+  );
+
+  test(
+    'Open with discards a download after its account context changes',
+    () async {
+      final service = _MockTerminalService();
+      final gateway = _FakeTerminalGateway(service: service)
+        ..selectedServer = server
+        ..currentPath = '/workspace/';
+      final harness = _TerminalControllerHarness(gateway);
+      addTearDown(harness.dispose);
+      final result = Completer<TerminalDownloadedFile>();
+      when(
+        () => service.downloadFile(
+          server,
+          document.path,
+          sessionScopeId: 'scope',
+        ),
+      ).thenAnswer((_) => result.future);
+      final opening = harness.browser.downloadEntry(
+        harness.browser.captureOperationContext()!,
+        document,
+        openWith: true,
+      );
+      gateway.service = _MockTerminalService();
+      result.complete(
+        TerminalDownloadedFile(
+          fileName: 'report.docx',
+          contentType: 'application/octet-stream',
+          bytes: Uint8List.fromList([1]),
+        ),
+      );
+      await opening;
+      check(harness.platform.openedFiles).isEmpty();
+      check(harness.browserFailures).isEmpty();
+    },
+  );
+
+  test(
+    'Open with reports native opening failures through existing handling',
+    () async {
+      final service = _MockTerminalService();
+      final gateway = _FakeTerminalGateway(service: service)
+        ..selectedServer = server
+        ..currentPath = '/workspace/';
+      final harness = _TerminalControllerHarness(gateway);
+      addTearDown(harness.dispose);
+      harness.platform.openError = StateError('No document handler');
+      when(
+        () => service.downloadFile(
+          server,
+          document.path,
+          sessionScopeId: 'scope',
+        ),
+      ).thenAnswer(
+        (_) async => TerminalDownloadedFile(
+          fileName: 'report.docx',
+          contentType: 'application/octet-stream',
+          bytes: Uint8List.fromList([1]),
+        ),
+      );
+      await harness.browser.downloadEntry(
+        harness.browser.captureOperationContext()!,
+        document,
+        openWith: true,
+      );
+      check(harness.browserFailures)
+          .deepEquals([TerminalBrowserFailure.openFile]);
+    },
   );
 
   test('context controller owns initial fallback selection', () async {
@@ -1010,7 +1122,7 @@ final class _TerminalControllerHarness {
       gateway: gateway,
       platformGateway: platform,
       isCurrentContext: isCurrentContext,
-      onFailure: (_) {},
+      onFailure: browserFailures.add,
     );
     context = TerminalContextController(
       gateway: gateway,
@@ -1026,6 +1138,7 @@ final class _TerminalControllerHarness {
   final _FakeTerminalPlatformGateway platform = _FakeTerminalPlatformGateway();
   final FakeTerminalScreen screen = FakeTerminalScreen();
   final List<TerminalContextFailure> failures = [];
+  final List<TerminalBrowserFailure> browserFailures = [];
   late final TerminalSessionController session;
   late final TerminalBrowserController browser;
   late final TerminalContextController context;
@@ -1118,12 +1231,24 @@ final class _FakeTerminalGateway
 final class _FakeTerminalPlatformGateway
     implements TerminalBrowserPlatformGateway {
   final List<TerminalPortPreview> previews = [];
+  final List<TerminalDownloadedFile> openedFiles = [];
+  Object? openError;
 
   @override
   Future<TerminalUploadFile?> pickUploadFile() async => null;
 
   @override
   Future<void> saveDownload(TerminalDownloadedFile downloaded) async {}
+
+  @override
+  Future<void> openFile(
+    TerminalDownloadedFile downloaded, {
+    required bool Function() isCurrent,
+  }) async {
+    if (!isCurrent()) return;
+    if (openError != null) throw openError!;
+    openedFiles.add(downloaded);
+  }
 
   @override
   Future<bool> openPort(TerminalPortPreview preview) async {

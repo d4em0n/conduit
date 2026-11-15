@@ -5471,6 +5471,37 @@ class ImageGalleryHostApiSetup {
     }
   }
 }
+/// Opens an app-private downloaded document using the system app picker.
+///
+/// Generated protocol from Pigeon that represents a handler of messages from Flutter.
+protocol NativeDocumentHostApi {
+  func openFile(path: String, mimeType: String) throws -> Bool
+}
+
+/// Generated setup class from Pigeon to handle messages through the `binaryMessenger`.
+class NativeDocumentHostApiSetup {
+  static var codec: FlutterStandardMessageCodec { ConduitPlatformApisPigeonCodec.shared }
+  /// Sets up an instance of `NativeDocumentHostApi` to handle messages through the `binaryMessenger`.
+  static func setUp(binaryMessenger: FlutterBinaryMessenger, api: NativeDocumentHostApi?, messageChannelSuffix: String = "") {
+    let channelSuffix = messageChannelSuffix.count > 0 ? ".\(messageChannelSuffix)" : ""
+    let openFileChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.conduit.NativeDocumentHostApi.openFile\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      openFileChannel.setMessageHandler { message, reply in
+        let args = message as! [Any?]
+        let pathArg = args[0] as! String
+        let mimeTypeArg = args[1] as! String
+        do {
+          let result = try api.openFile(path: pathArg, mimeType: mimeTypeArg)
+          reply(wrapResult(result))
+        } catch {
+          reply(wrapError(error))
+        }
+      }
+    } else {
+      openFileChannel.setMessageHandler(nil)
+    }
+  }
+}
 /// Generated protocol from Pigeon that represents a handler of messages from Flutter.
 protocol NativeSheetHostApi {
   func setTheme(theme: PlatformNativeSheetTheme) throws

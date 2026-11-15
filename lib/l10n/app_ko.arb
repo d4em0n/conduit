@@ -4831,5 +4831,7 @@
   "settingsAddAction": "추가",
   "@settingsAddAction": {
     "description": "Read aloud for the plus button in a Settings page's bar that adds an item, such as a calendar event."
-  }
+  },
+  "openWith": "다른 앱으로 열기…",
+  "documentOpenFailed": "파일을 열 수 없습니다. 이 파일 형식을 지원하는 앱이 설치되어 있는지 확인하세요."
 }
