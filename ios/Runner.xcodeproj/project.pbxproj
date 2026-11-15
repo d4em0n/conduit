@@ -69,6 +69,7 @@
 		DBC0D65B545D5CC5996C5879 /* PushBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ACFF262BA737A4AE4CBFBFE /* PushBridge.swift */; };
 		E433D197A968E0CBAB1D23AF /* PushConfigStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DAE9782FF2DE370E5BD733C /* PushConfigStore.swift */; };
 		E6C41A0C2F9E4D6C7B8A9012 /* NativeImageViewerBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C41A0B2F9E4D6C7B8A9012 /* NativeImageViewerBridge.swift */; };
+		E6C41A0E2F9E4D6C7B8A9012 /* NativeDocumentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6C41A0D2F9E4D6C7B8A9012 /* NativeDocumentBridge.swift */; };
 		F15AFEC42EE5499D00A1FABB /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F15AFEC32EE5499D00A1FABB /* WidgetKit.framework */; };
 		F15AFEC62EE5499D00A1FABB /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F15AFEC52EE5499D00A1FABB /* SwiftUI.framework */; };
 		F15AFED12EE5499E00A1FABB /* ConduitWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F15AFEC22EE5499D00A1FABB /* ConduitWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -212,6 +213,7 @@
 		E536BB32010750795CF717F1 /* NotificationService.debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = NotificationService/NotificationService.debug.xcconfig; sourceTree = "<group>"; };
 		E590F0BC5DD9A3EFB1FDDDBF /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		E6C41A0B2F9E4D6C7B8A9012 /* NativeImageViewerBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeImageViewerBridge.swift; sourceTree = "<group>"; };
+		E6C41A0D2F9E4D6C7B8A9012 /* NativeDocumentBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDocumentBridge.swift; sourceTree = "<group>"; };
 		E952EFF81F1FEABA348FE2CC /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF9BA299CBDD47B7A39E896E /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F15AFEC22EE5499D00A1FABB /* ConduitWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ConduitWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -496,6 +498,7 @@
 				D2A0B1E62F5E4D6C7B8A9012 /* NativeSheetUIFoundation.swift */,
 				D2A0B1F32F5E4D6C7B8A9012 /* NativeDropdownBridge.swift */,
 				E6C41A0B2F9E4D6C7B8A9012 /* NativeImageViewerBridge.swift */,
+				E6C41A0D2F9E4D6C7B8A9012 /* NativeDocumentBridge.swift */,
 				D2A0B1F52F5E4D6C7B8A9013 /* NativeSymbolImageBridge.swift */,
 				D2A0B2032F5E4D6C7B8A9012 /* NativeSttBridge.swift */,
 				D2A0B4012F5E4D6C7B8A9012 /* RecordingActivityBridge.swift */,
@@ -843,6 +846,7 @@
 			files = (
 				D2A0B1F42F5E4D6C7B8A9012 /* NativeDropdownBridge.swift in Sources */,
 				E6C41A0C2F9E4D6C7B8A9012 /* NativeImageViewerBridge.swift in Sources */,
+				E6C41A0E2F9E4D6C7B8A9012 /* NativeDocumentBridge.swift in Sources */,
 				D2A0B1F62F5E4D6C7B8A9013 /* NativeSymbolImageBridge.swift in Sources */,
 				D2A0B2062F5E4D6C7B8A9012 /* ConduitSceneDelegate.swift in Sources */,
 				D2A0B2142F5E4D6C7B8A9012 /* ConduitPlatformApis.g.swift in Sources */,
