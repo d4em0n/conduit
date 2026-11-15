@@ -726,17 +726,25 @@ class TerminalService {
     required String sessionScopeId,
   }) async {
     final normalizedPath = normalizeTerminalPath(path);
+    final renderOffice = {'.docx', '.pptx'}.contains(
+      p.extension(normalizedPath).toLowerCase(),
+    );
+    final endpoint = renderOffice ? 'view' : 'read';
+    final query = <String, dynamic>{
+      'path': normalizedPath,
+      if (renderOffice) 'preview': true,
+    };
     final response = server.isSystem
         ? await _requestSystem(
-            '/api/v1/terminals/${server.systemServerId}/files/read',
-            queryParameters: <String, dynamic>{'path': normalizedPath},
+            '/api/v1/terminals/${server.systemServerId}/files/$endpoint',
+            queryParameters: query,
             responseType: ResponseType.bytes,
             sessionScopeId: sessionScopeId,
           )
         : await _requestDirect(
             server,
-            '/files/read',
-            queryParameters: <String, dynamic>{'path': normalizedPath},
+            '/files/$endpoint',
+            queryParameters: query,
             responseType: ResponseType.bytes,
             sessionScopeId: sessionScopeId,
           );
