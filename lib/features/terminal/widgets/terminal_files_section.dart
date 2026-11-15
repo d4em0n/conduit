@@ -288,12 +288,6 @@ class TerminalFilesSection extends StatelessWidget {
     final operationContext = coordinator.captureOperationContext();
     if (operationContext == null) return;
     switch (action) {
-      case 'open-with':
-        await coordinator.downloadEntry(
-          operationContext,
-          entry,
-          openWith: true,
-        );
       case 'download':
         await coordinator.downloadEntry(operationContext, entry);
       case 'rename':
@@ -367,15 +361,6 @@ class TerminalFilesSection extends StatelessWidget {
     return [
       if (!entry.isDirectory)
         AdaptivePopupMenuItem<String>(
-          value: 'open-with',
-          label: l10n.openWith,
-          icon: conduitAdaptivePopupMenuIcon(
-            iosSymbol: 'square.and.arrow.up',
-            materialIcon: Icons.open_in_new,
-          ),
-        ),
-      if (!entry.isDirectory)
-        AdaptivePopupMenuItem<String>(
           value: 'download',
           label: l10n.download,
           icon: conduitAdaptivePopupMenuIcon(
@@ -439,17 +424,6 @@ Future<void> showTerminalFilePreview(
           ConduitTextButton(
             text: l10n.close,
             onPressed: () => Navigator.of(dialogContext).pop(),
-          ),
-          ConduitTextButton(
-            text: l10n.openWith,
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              coordinator.downloadEntry(
-                operationContext,
-                entry,
-                openWith: true,
-              );
-            },
           ),
           ConduitTextButton(
             text: l10n.download,

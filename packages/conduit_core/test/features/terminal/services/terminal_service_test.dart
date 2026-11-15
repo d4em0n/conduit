@@ -97,6 +97,24 @@ void main() {
         },
       );
 
+      test('PDF previews fetch original bytes instead of extracted text', () async {
+        for (final name in ['report.pdf', 'report.PDF', 'report.pdf']) {
+          final result = await service.readFile(
+            terminal,
+            '/Documents/$name',
+            sessionScopeId: 'chat-1',
+          );
+          expect(result.bytes, body);
+          expect(result.fileName, name);
+        }
+        expect(requests, hasLength(3));
+        for (final request in requests) {
+          expect(request.uri.path, endsWith('/files/view'));
+          expect(request.uri.queryParameters.containsKey('preview'), isFalse);
+          expect(request.headers.value('x-session-id'), 'chat-1');
+        }
+      });
+
       test('unavailable conversion preserves the binary fallback and original download', () async {
         contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
         body = [80, 75, 3, 4, 0, 255];

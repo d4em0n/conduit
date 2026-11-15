@@ -726,10 +726,9 @@ class TerminalService {
     required String sessionScopeId,
   }) async {
     final normalizedPath = normalizeTerminalPath(path);
-    final renderOffice = {'.docx', '.pptx'}.contains(
-      p.extension(normalizedPath).toLowerCase(),
-    );
-    final endpoint = renderOffice ? 'view' : 'read';
+    final extension = p.extension(normalizedPath).toLowerCase();
+    final renderOffice = {'.docx', '.pptx'}.contains(extension);
+    final endpoint = renderOffice || extension == '.pdf' ? 'view' : 'read';
     final query = <String, dynamic>{
       'path': normalizedPath,
       if (renderOffice) 'preview': true,
