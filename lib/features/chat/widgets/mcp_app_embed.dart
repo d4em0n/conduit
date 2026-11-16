@@ -17,6 +17,7 @@ import 'package:conduit/features/direct_connections/widgets/direct_mcp_app_view.
         directMcpAppNetworkRequestAllowed,
         directMcpAppWebViewSettings;
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/shared/widgets/themed_sheets.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/utils/external_link_launcher.dart';
 import 'package:conduit/shared/widgets/conduit_components.dart';
@@ -184,7 +185,9 @@ class _McpAppEmbedState extends ConsumerState<McpAppEmbed> {
 
   void _scheduleOpen() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_opened) unawaited(_open());
+      if (mounted && !_opened && !ThemedSheets.isCoveredBySheet(context)) {
+        unawaited(_open());
+      }
     });
   }
 
@@ -413,6 +416,21 @@ class _McpAppEmbedState extends ConsumerState<McpAppEmbed> {
   @override
   Widget build(BuildContext context) {
     ref.listen(mcpAppResourceCacheProvider, (_, _) => _close());
+    return ListenableBuilder(
+      listenable: ThemedSheets.activeSheetListenable,
+      builder: (context, _) {
+        if (ThemedSheets.isCoveredBySheet(context)) {
+          // UIKit WebViews can otherwise draw above Flutter modal sheets.
+          if (_opened && _failure == null) _close(rebuild: false);
+          return SizedBox(height: _height);
+        }
+        if (!_opened) _scheduleOpen();
+        return _buildApp(context);
+      },
+    );
+  }
+
+  Widget _buildApp(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final failure = _failure;
     if (failure != null) {

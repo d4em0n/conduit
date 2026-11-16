@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:conduit/features/chat/widgets/mcp_app_embed.dart';
+import 'package:conduit/shared/widgets/themed_sheets.dart';
 import 'package:conduit/features/chat/widgets/chat_timeline_viewport.dart';
 import 'package:conduit/features/direct_connections/widgets/direct_mcp_app_view.dart';
 import 'package:flutter/foundation.dart';
@@ -243,6 +244,61 @@ Widget _harness(
 );
 
 void main() {
+  testWidgets(
+    'a covering sheet removes the app platform view and restores its cached height',
+    (tester) async {
+      final api = _ServingApi();
+      final app = await _openApp(tester, api);
+      await app.post({
+        'jsonrpc': '2.0',
+        'method': 'ui/notifications/initialized',
+      });
+      await app.post({
+        'jsonrpc': '2.0',
+        'method': 'ui/notifications/size-changed',
+        'params': {'height': 420},
+      });
+      await tester.pumpAndSettle();
+      final firstOrigin = app.documentUrl;
+      final context = tester.element(find.byType(McpAppEmbed));
+      final sheet = ThemedSheets.showCustom<void>(
+        context: context,
+        builder: (_) =>
+            const SizedBox(height: 200, child: Text('Synthetic tool details')),
+      );
+      await tester.pumpAndSettle();
+      try {
+        expect(find.byType(InAppWebView), findsNothing);
+        expect(tester.getSize(find.byType(McpAppEmbed)).height, 420);
+      } finally {
+        Navigator.of(context, rootNavigator: true).pop();
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        await tester.pump();
+        await sheet;
+      }
+      final restored = _OpenApp(app.webViews);
+      restored.view.onWebViewCreated!(restored.controller);
+      await restored.post({
+        'jsonrpc': '2.0',
+        'method': 'ui/notifications/initialized',
+      });
+      await tester.pumpAndSettle();
+      expect(find.byType(InAppWebView), findsOneWidget);
+      expect(restored.documentUrl, isNot(firstOrigin));
+      expect(
+        tester
+            .getSize(find.byKey(const ValueKey<String>('mcp-app-view')))
+            .height,
+        420,
+      );
+      expect(
+        api.requests.where((r) => r.method == 'ui/resource'),
+        hasLength(1),
+      );
+    },
+  );
   test('the sealed web view keeps other web sessions on Android', () {
     // The plugin's Android incognito deletes every web view's cookies.
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
