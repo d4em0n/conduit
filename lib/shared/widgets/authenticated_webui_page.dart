@@ -85,6 +85,12 @@ class _AuthenticatedWebUiPageState
   late final _auth = _api.captureAuthSnapshot();
   late final Uri _root = Uri.parse(_api.baseUrl);
   late final Future<String?> _prepared = _prepare();
+  late final Uri _bootstrapUri = _root.replace(
+    path: '${_root.path.replaceFirst(RegExp(r'/+$'), '')}/',
+    query: null,
+    fragment: null,
+  );
+  bool _bootstrapPending = true;
   InAppWebViewController? _web;
   Uri? _allowedNavigation;
   bool _retired = false, _loading = true, _failed = false, _saving = false;
@@ -266,6 +272,11 @@ localStorage.getItem('token') === ${jsonEncode(_owner.authToken)}''',
     if (action.isForMainFrame == false && !newWindow) {
       return NavigationActionPolicy.ALLOW;
     }
+    if (_bootstrapPending && !newWindow) {
+      _bootstrapPending = false;
+      // WKWebView reports loadData's base URL before the session is seeded.
+      if (target == _bootstrapUri) return NavigationActionPolicy.ALLOW;
+    }
     if (isWebUiApplicationPage(_root, target)) {
       if (target == _allowedNavigation && !newWindow) {
         _allowedNavigation = null;
@@ -344,13 +355,7 @@ localStorage.getItem('token') === ${jsonEncode(_owner.authToken)}''',
             children: [
               InAppWebView(
                 initialData: InAppWebViewInitialData(
-                  baseUrl: WebUri.uri(
-                    _root.replace(
-                      path: '${_root.path.replaceFirst(RegExp(r'/+$'), '')}/',
-                      query: null,
-                      fragment: null,
-                    ),
-                  ),
+                  baseUrl: WebUri.uri(_bootstrapUri),
                   data:
                       '<!doctype html><html><body><script>${script.replaceFirst('"bootstrap":false', '"bootstrap":true')}</script></body></html>',
                 ),

@@ -134,6 +134,34 @@ void main() {
       );
       expect(params.initialUserScripts!.single.forMainFrameOnly, isTrue);
       expect(params.initialSettings!.allowFileAccess, isFalse);
+      final controller = ComputerTestWebController();
+      params.onWebViewCreated!(controller);
+      // WKWebView asks about loadData's base URL before running its bootstrap.
+      expect(
+        await params.shouldOverrideUrlLoading!(
+          controller,
+          NavigationAction(
+            request: URLRequest(url: WebUri('https://webui.example/')),
+            isForMainFrame: true,
+            navigationType: NavigationType.OTHER,
+          ),
+        ),
+        NavigationActionPolicy.ALLOW,
+      );
+      expect(controller.scripts, isEmpty);
+      expect(
+        await params.shouldOverrideUrlLoading!(
+          controller,
+          NavigationAction(
+            request: URLRequest(
+              url: WebUri('https://webui.example/viewer?file=demo'),
+            ),
+            isForMainFrame: true,
+            navigationType: NavigationType.OTHER,
+          ),
+        ),
+        NavigationActionPolicy.ALLOW,
+      );
       container.read(_epoch.notifier).change();
       await tester.pumpAndSettle();
       expect(find.byType(AuthenticatedWebUiPage), findsNothing);
