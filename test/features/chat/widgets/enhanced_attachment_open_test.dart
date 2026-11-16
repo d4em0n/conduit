@@ -5,9 +5,7 @@ import 'dart:io';
 import 'package:conduit/features/chat/widgets/enhanced_attachment.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
-import 'package:conduit/platform/conduit_platform_apis.g.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
-import 'package:conduit/shared/widgets/conduit_components.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit_core/auth/api_auth_interceptor.dart';
 import 'package:conduit_core/models/server_config.dart';
@@ -32,6 +30,7 @@ class _DocumentApi extends ApiService {
       );
 
   var requests = 0;
+  void Function()? onRequest;
   Completer<String>? pending;
 
   @override
@@ -54,16 +53,14 @@ class _DocumentApi extends ApiService {
     CancelToken? cancelToken,
   }) async {
     requests++;
+    onRequest?.call();
     return pending?.future ?? base64Encode([0, 255, requests]);
   }
 }
 
 void main() {
   const pathsChannel = MethodChannel('plugins.flutter.io/path_provider');
-  const documentChannel = BasicMessageChannel<Object?>(
-    'dev.flutter.pigeon.conduit.NativeDocumentHostApi.openFile',
-    NativeDocumentHostApi.pigeonChannelCodec,
-  );
+  const shareChannel = MethodChannel('dev.fluttercommunity.plus/share');
   late Directory temporary;
   final opened = <List<int>>[];
 
@@ -76,11 +73,10 @@ void main() {
       pathsChannel,
       (_) async => temporary.path,
     );
-    messenger.setMockDecodedMessageHandler<Object?>(documentChannel, (
-      message,
-    ) async {
-      opened.add(await File((message! as List)[0] as String).readAsBytes());
-      return [true];
+    messenger.setMockMethodCallHandler(shareChannel, (call) async {
+      final paths = (call.arguments as Map)['paths'] as List;
+      opened.add(await File(paths.single as String).readAsBytes());
+      return 'dev.fluttercommunity.plus/share/unavailable';
     });
   });
 
@@ -88,7 +84,7 @@ void main() {
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(pathsChannel, null);
-    messenger.setMockDecodedMessageHandler<Object?>(documentChannel, null);
+    messenger.setMockMethodCallHandler(shareChannel, null);
     await temporary.delete(recursive: true);
   });
 
@@ -116,7 +112,7 @@ void main() {
   }
 
   testWidgets(
-    'chat Open with fetches fresh bytes on every tap, including small binary files',
+    'chat attachment retains its original share action with fresh binary bytes',
     (tester) async {
       final api = _DocumentApi();
       final container = ProviderContainer(
@@ -127,11 +123,19 @@ void main() {
       );
       addTearDown(container.dispose);
       await pumpAttachment(tester, container);
+      expect(find.text('Open with…'), findsNothing);
       for (var revision = 1; revision <= 2; revision++) {
         final open =
             tester
-                    .widget<ConduitTextButton>(find.byType(ConduitTextButton))
-                    .onPressed
+                    .widget<GestureDetector>(
+                      find
+                          .ancestor(
+                            of: find.text('report.docx'),
+                            matching: find.byType(GestureDetector),
+                          )
+                          .first,
+                    )
+                    .onTap
                 as Future<void> Function();
         await tester.runAsync(open);
         await tester.pumpAndSettle();
@@ -145,6 +149,50 @@ void main() {
     },
   );
 
+  testWidgets('an account change during local preparation prevents sharing', (
+    tester,
+  ) async {
+    final api = _DocumentApi();
+    final container = ProviderContainer(
+      overrides: [
+        apiServiceProvider.overrideWithValue(api),
+        openWebUiAuthSessionEpochProvider.overrideWith((ref) => Object()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await pumpAttachment(tester, container);
+    final share =
+        tester
+                .widget<GestureDetector>(
+                  find
+                      .ancestor(
+                        of: find.text('report.docx'),
+                        matching: find.byType(GestureDetector),
+                      )
+                      .first,
+                )
+                .onTap
+            as Future<void> Function();
+    await tester.runAsync(() async {
+      final preparing = Completer<void>();
+      final directory = Completer<String>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(pathsChannel, (_) {
+            preparing.complete();
+            return directory.future;
+          });
+      final sharing = share();
+      await preparing.future;
+      container.invalidate(openWebUiAuthSessionEpochProvider);
+      directory.complete(temporary.path);
+      await sharing;
+    });
+    await tester.pumpAndSettle();
+    expect(api.requests, 1);
+    expect(opened, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('chat account change discards an in-flight document', (
     tester,
   ) async {
@@ -157,8 +205,25 @@ void main() {
     );
     addTearDown(container.dispose);
     await pumpAttachment(tester, container);
-    await tester.tap(find.text('Open with…'));
-    await tester.pump();
+    final share =
+        tester
+                .widget<GestureDetector>(
+                  find
+                      .ancestor(
+                        of: find.text('report.docx'),
+                        matching: find.byType(GestureDetector),
+                      )
+                      .first,
+                )
+                .onTap
+            as Future<void> Function();
+    await tester.runAsync(() async {
+      final started = Completer<void>();
+      api.onRequest = started.complete;
+      unawaited(share());
+      await started.future;
+    });
+    await tester.pumpAndSettle();
     container.invalidate(openWebUiAuthSessionEpochProvider);
     api.pending!.complete(base64Encode([1, 2, 3]));
     await tester.pumpAndSettle();

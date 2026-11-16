@@ -14,11 +14,14 @@ import 'enhanced_image_attachment.dart';
 import 'enhanced_video_attachment.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
-import 'package:conduit/platform/native_document_opener.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:conduit_core/features/terminal/controllers/terminal_controller_gateways.dart'
+    show safeTerminalFileName;
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
-import 'package:conduit/shared/widgets/conduit_components.dart';
 
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:conduit_core/services/worker_manager.dart';
 
@@ -46,7 +49,7 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
   Map<String, dynamic>? _fileInfo;
   bool _isLoading = true;
   String? _error;
-  bool _opening = false;
+  bool _sharing = false;
 
   @override
   void initState() {
@@ -126,8 +129,8 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
     return size is num ? size.toInt() : null;
   }
 
-  Future<void> _openFile() async {
-    if (_opening) return;
+  Future<void> _shareFile() async {
+    if (_sharing) return;
     final api = ref.read(apiServiceProvider);
     if (api is! ApiService) return;
     final l10n = AppLocalizations.of(context)!;
@@ -139,7 +142,7 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
         widget.attachmentId == attachmentId &&
         identical(ref.read(apiServiceProvider), api) &&
         ref.read(openWebUiAuthSessionEpochProvider) == account;
-    setState(() => _opening = true);
+    setState(() => _sharing = true);
     try {
       final content = await api.getFileContent(
         attachmentId,
@@ -156,18 +159,37 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
       if (!current()) return;
       final filename = (_fileInfo?['filename'] ?? _fileInfo?['name'] ?? 'file')
           .toString();
-      await openDownloadedDocument(
-        bytes,
-        filename,
-        _contentTypeOf(_fileInfo) ?? 'application/octet-stream',
-        isCurrent: current,
+      final directory = await (await getTemporaryDirectory()).createTemp(
+        'conduit-attachment-',
+      );
+      final file = File('${directory.path}/${safeTerminalFileName(filename)}');
+      await file.writeAsBytes(bytes, flush: true);
+      if (!current()) {
+        await directory.delete(recursive: true);
+        return;
+      }
+      final renderObject = context.findRenderObject();
+      final origin = renderObject is RenderBox && renderObject.hasSize
+          ? renderObject.localToGlobal(Offset.zero) & renderObject.size
+          : null;
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile(
+              file.path,
+              mimeType: _contentTypeOf(_fileInfo) ?? 'application/octet-stream',
+            ),
+          ],
+          fileNameOverrides: [safeTerminalFileName(filename)],
+          sharePositionOrigin: origin,
+        ),
       );
     } catch (_) {
       if (mounted && current()) {
         AdaptiveSnackBar.show(context, message: l10n.documentOpenFailed);
       }
     } finally {
-      if (mounted) setState(() => _opening = false);
+      if (mounted) setState(() => _sharing = false);
     }
   }
 
@@ -345,11 +367,6 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
               ],
             ),
           ),
-          const SizedBox(width: Spacing.xs),
-          ConduitTextButton(
-            text: AppLocalizations.of(context)!.openWith,
-            onPressed: _opening ? null : _openFile,
-          ),
         ],
       ),
     );
@@ -358,11 +375,11 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
       button: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: _opening
+        onTap: _sharing
             ? null
             : () async {
                 await ConduitHaptics.mediumImpact();
-                await _openFile();
+                await _shareFile();
               },
         child: card,
       ),
