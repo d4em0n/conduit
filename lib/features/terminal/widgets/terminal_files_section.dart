@@ -1,3 +1,4 @@
+import 'package:conduit_core/features/chat/utils/file_utils.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -20,6 +21,7 @@ import '../controllers/terminal_coordinator.dart';
 import '../models/terminal_models.dart';
 import '../services/terminal_service.dart';
 import 'terminal_section_components.dart';
+import 'authenticated_webui_page.dart';
 
 class TerminalFilesSection extends StatelessWidget {
   const TerminalFilesSection({
@@ -399,6 +401,32 @@ Future<void> showTerminalFilePreview(
 }) async {
   final operationContext = coordinator.captureOperationContext();
   if (operationContext == null) return;
+  if (operationContext.server.isSystem &&
+      operationContext.server.systemServerId != null &&
+      isWebUiDocumentName(entry.name)) {
+    final shown = await AuthenticatedWebUiPage.open(
+      context,
+      fileName: entry.displayName,
+      target: {
+        'terminal_id': operationContext.server.systemServerId!,
+        'path': entry.path,
+        if (isSavedTerminalChatScopeId(operationContext.sessionScopeId))
+          'chat_id': operationContext.sessionScopeId,
+        if (page != null && page > 0) 'page': '$page',
+      },
+      download: () => coordinator.downloadEntry(operationContext, entry),
+      isCurrent: () {
+        final current = coordinator.captureOperationContext();
+        return current != null &&
+            identical(current.service, operationContext.service) &&
+            current.server.selectionId == operationContext.server.selectionId &&
+            current.sessionScopeId == operationContext.sessionScopeId &&
+            isCurrent?.call() != false;
+      },
+      onShown: onShown,
+    );
+    if (shown || !context.mounted || isCurrent?.call() == false) return;
+  }
   final preview = await coordinator.readEntry(operationContext, entry);
   if (preview == null || !context.mounted || isCurrent?.call() == false) {
     return;

@@ -10,6 +10,7 @@ import 'package:conduit_core/features/chat/utils/file_utils.dart';
 import 'package:conduit_core/providers/app_providers.dart';
 import 'package:conduit_core/services/api_service.dart';
 
+import '../../terminal/widgets/authenticated_webui_page.dart';
 import 'enhanced_image_attachment.dart';
 import 'enhanced_video_attachment.dart';
 
@@ -141,6 +142,17 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
         ref.read(openWebUiAuthSessionEpochProvider) == account;
     setState(() => _opening = true);
     try {
+      final filename = (_fileInfo?['filename'] ?? _fileInfo?['name'] ?? 'file')
+          .toString();
+      if (isWebUiDocumentName(filename)) {
+        final shown = await AuthenticatedWebUiPage.open(
+          context,
+          fileName: filename,
+          target: {'file_id': attachmentId},
+          isCurrent: current,
+        );
+        if (shown || !current()) return;
+      }
       final content = await api.getFileContent(
         attachmentId,
         authSnapshot: auth,
@@ -154,8 +166,6 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
         debugLabel: 'attachment_decode_bytes',
       );
       if (!current()) return;
-      final filename = (_fileInfo?['filename'] ?? _fileInfo?['name'] ?? 'file')
-          .toString();
       await openDownloadedDocument(
         bytes,
         filename,
@@ -347,7 +357,9 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
           ),
           const SizedBox(width: Spacing.xs),
           ConduitTextButton(
-            text: AppLocalizations.of(context)!.openWith,
+            text: isWebUiDocumentName(filename)
+                ? AppLocalizations.of(context)!.openPreview
+                : AppLocalizations.of(context)!.openWith,
             onPressed: _opening ? null : _openFile,
           ),
         ],

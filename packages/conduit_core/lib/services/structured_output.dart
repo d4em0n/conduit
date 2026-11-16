@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../features/chat/utils/file_utils.dart';
+
 /// Typed representation of Open WebUI structured `output` items.
 ///
 /// These blocks keep protocol parsing separate from UI string rendering. Raw
@@ -220,8 +222,8 @@ final RegExp _openWebUiFilePath = RegExp(r'^/api/v1/files/([\w-]+)/content$');
 /// The files a model showed in the chat with Open WebUI's `display_file` tool
 /// (0.12.5+), in [output] order, each once, as entries of a message's file
 /// list. The tool tells the model the user already sees the file, so it must
-/// be shown with the reply. A terminal's file opens in the terminal pane
-/// instead and is not among them.
+/// be shown with the reply. Terminal documents are passive covers; their
+/// source selector/path remains separate from uploaded file IDs.
 List<Map<String, dynamic>> displayedChatFiles(List<dynamic>? output) {
   if (output == null || output.isEmpty) return const [];
   final results = <String, Map<String, dynamic>>{};
@@ -243,9 +245,7 @@ List<Map<String, dynamic>> displayedChatFiles(List<dynamic>? output) {
   return files;
 }
 
-/// The file one `display_file` call showed, from its result: an Open WebUI
-/// file that exists, as a message file entry. Null for any other call or
-/// result.
+/// A displayed uploaded file or a passive Terminal document cover.
 Map<String, dynamic>? _displayedChatFile(
   Map<String, dynamic> call,
   Map<String, dynamic>? result,
@@ -254,12 +254,32 @@ Map<String, dynamic>? _displayedChatFile(
   final parsed = _jsonValue(
     _toolResultText(result['output'] ?? result['content']),
   );
-  if (parsed is! Map ||
-      parsed['type'] != 'file' ||
-      parsed['exists'] == false ||
-      parsed['source'] != 'open_webui') {
+  if (parsed is! Map || parsed['type'] != 'file' || parsed['exists'] == false) {
     return null;
   }
+  if (parsed['source'] == 'open_terminal') {
+    final path = parsed['full_path'] ?? parsed['path'];
+    final selector = parsed['terminal_selector'];
+    if (path is! String ||
+        !isWebUiDocumentName(path) ||
+        selector is! String ||
+        selector.trim().isEmpty) {
+      return null;
+    }
+    final id = 'terminal:${jsonEncode([selector, path])}';
+    final name = parsed['name'];
+    final page = parsed['page'];
+    return {
+      'type': 'terminal_document',
+      'id': id,
+      'url': id,
+      'path': path,
+      'terminal_selector': selector,
+      'name': name is String && name.isNotEmpty ? name : path.split('/').last,
+      if (page is int && page > 0) 'page': page,
+    };
+  }
+  if (parsed['source'] != 'open_webui') return null;
   final path = parsed['path'];
   final match = path is String ? _openWebUiFilePath.firstMatch(path) : null;
   if (match == null) return null;

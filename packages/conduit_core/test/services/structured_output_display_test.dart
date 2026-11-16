@@ -80,6 +80,31 @@ void main() {
       ).isEmpty();
     });
 
+    test('terminal documents become passive covers with their exact source and page', () {
+      final files = displayedChatFiles([
+        call('c1', 'display_file'),
+        result('c1', {
+          ...shown(source: 'open_terminal', path: 'Report.pdf'),
+          'full_path': '/home/user/Documents/Report.pdf',
+          'terminal_selector': 'workspace',
+          'page': 4,
+        }),
+        call('c2', 'display_file'),
+        result('c2', {
+          ...shown(source: 'open_terminal', path: 'Report.pdf'),
+          'full_path': '/home/user/Documents/Report.pdf',
+          'terminal_selector': 'other-workspace',
+        }),
+      ]);
+      check(files).length.equals(2);
+      check(files.first['type']).equals('terminal_document');
+      check(files.first['path']).equals('/home/user/Documents/Report.pdf');
+      check(files.first['terminal_selector']).equals('workspace');
+      check(files.first['page']).equals(4);
+      check(files.first['name']).equals('Report.pdf');
+      check(files.first['id'] == files.last['id']).isFalse();
+    });
+
     test('each file once', () {
       check(
         displayedChatFiles([
@@ -233,18 +258,16 @@ void main() {
         },
         {'type': 'image_generation_call', 'id': 'ig3', 'result': ''},
       ]);
-      check(
-        blocks.whereType<StructuredOutputImageBlock>().map((b) => b.url),
-      ).deepEquals([
-        'data:image/webp;base64,AAAA',
-        'data:image/jpeg;base64,BBBB',
-      ]);
+      check(blocks.whereType<StructuredOutputImageBlock>().map((b) => b.url))
+          .deepEquals([
+            'data:image/webp;base64,AAAA',
+            'data:image/jpeg;base64,BBBB',
+          ]);
       final rendered = renderStructuredOutputBlocks(blocks);
       // Described by the prompt it was made from, on one line, with its
       // brackets kept from ending the description.
-      check(rendered).contains(
-        r'![A red \[ripe\] apple](data:image/webp;base64,AAAA)',
-      );
+      check(rendered)
+          .contains(r'![A red \[ripe\] apple](data:image/webp;base64,AAAA)');
       check(rendered).contains('![](data:image/jpeg;base64,BBBB)');
     });
   });

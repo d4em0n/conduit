@@ -138,3 +138,7 @@ List<dynamic> chatFilesWithShown(
       if (!shownIds.contains(file['id'])) file,
   ];
 }
+
+/// Documents supported by the optional WebUI preview page.
+bool isWebUiDocumentName(String name) =>
+    RegExp(r'\.(pdf|docx|pptx|xlsx|xls)$', caseSensitive: false).hasMatch(name);

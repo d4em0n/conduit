@@ -54,6 +54,7 @@ import 'image_gallery_scope.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 
 import 'enhanced_attachment.dart';
+import 'terminal_document_cover.dart';
 
 import 'package:conduit/shared/widgets/chat_action_button.dart';
 
@@ -1863,9 +1864,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       surface: surface,
       errorText: message.error?.content,
       onRetry: widget.readOnly ? null : widget.onRegenerate,
-      onContinue: widget.readOnly
-          ? null
-          : () => _handleFollowUpTap('continue'),
+      onContinue: widget.readOnly ? null : () => _handleFollowUpTap('continue'),
     );
   }
 
@@ -2342,6 +2341,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       spacing: Spacing.sm,
       runSpacing: Spacing.sm,
       children: nonImageFiles.map<Widget>((file) {
+        if (file is Map && file['type'] == 'terminal_document') {
+          return TerminalDocumentCover(file: Map<String, dynamic>.from(file));
+        }
         final fileUrl = getFileUrl(file);
         if (fileUrl == null) return const SizedBox.shrink();
 

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../utils/file_utils.dart';
+
 import 'package:conduit_core/models/chat_message.dart';
 
 import 'package:conduit_core/providers/app_providers.dart'
@@ -520,6 +522,11 @@ Future<bool> dispatchChatTransport({
     },
     onTerminalEvent: (type, data) {
       if (!ownsConversation()) return;
+      // Document results show a cover in the reply. Fetch/render only on tap.
+      if (type == 'terminal:display_file' &&
+          isWebUiDocumentName(data['path']?.toString() ?? '')) {
+        return;
+      }
       if (type == 'terminal:display_file' &&
           (data['path']?.toString().trim().isNotEmpty ?? false)) {
         ref.read(sidebarActiveTabProvider.notifier).set(SidebarTabId.terminal);
