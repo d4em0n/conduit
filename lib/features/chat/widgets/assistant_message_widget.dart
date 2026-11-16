@@ -112,6 +112,7 @@ import 'chat_branch_actions.dart';
 import 'chat_comparison_widgets.dart';
 
 import 'package:conduit/features/chat/widgets/mcp_app_embed.dart';
+import 'package:conduit/shared/widgets/authenticated_webui_page.dart';
 import 'package:conduit_core/features/mcp_apps/openwebui_mcp_app.dart';
 
 import 'code_execution_display.dart';
@@ -1917,8 +1918,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     );
   }
 
-  void _handleMarkdownLinkTap(String url, String _) {
-    launchExternalLink(url, scope: 'chat/assistant');
+  Future<void> _handleMarkdownLinkTap(String url, String _) async {
+    if (await openAuthenticatedWebUiLink(context, url) || !mounted) return;
+    await launchExternalLink(url, scope: 'chat/assistant');
   }
 
   Widget _buildMarkdownImage(Uri uri, String? title, String? alt) {

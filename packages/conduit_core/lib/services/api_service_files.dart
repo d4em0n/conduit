@@ -1,6 +1,121 @@
 part of 'api_service.dart';
 
 mixin _FilesApi on _ApiServiceBase {
+  /// Reads a link with its captured account. HTML application pages are loaded
+  /// by the browser; file/API responses remain bytes, including uploaded HTML.
+  Future<({Uri uri, Uint8List? bytes, String contentType, String fileName})>
+  getWebUiLink(
+    Uri target, {
+    required ApiAuthSnapshot authSnapshot,
+    CancelToken? cancelToken,
+    int maxBytes = 32 * 1024 * 1024,
+  }) async {
+    final root = Uri.parse(baseUrl);
+    if (maxBytes <= 0) throw ArgumentError.value(maxBytes, 'maxBytes');
+    for (var hop = 0; hop <= 5; hop++) {
+      if (!isWebUiServerLink(root, target)) {
+        throw const FormatException('Link is outside the configured server.');
+      }
+      final cancellation = _FileContentCancellationLink(cancelToken);
+      final token = cancellation.requestToken;
+      try {
+        final response = await _dio.get<ResponseBody>(
+          target.toString(),
+          options: _withAuthSnapshot(
+            Options(
+              responseType: ResponseType.stream,
+              followRedirects: false,
+              validateStatus: (status) => status != null && status < 400,
+            ),
+            authSnapshot,
+          ),
+          cancelToken: token,
+        );
+        if (response.statusCode! >= 300) {
+          final location = response.headers.value(HttpHeaders.locationHeader);
+          if (location == null || hop == 5) {
+            throw const FormatException('Invalid server link redirect.');
+          }
+          target = target.resolve(location);
+          continue;
+        }
+        final contentType =
+            response.headers
+                .value(Headers.contentTypeHeader)
+                ?.split(';')
+                .first
+                .trim()
+                .toLowerCase() ??
+            'application/octet-stream';
+        final disposition = response.headers.value('content-disposition') ?? '';
+        final isPage =
+            isWebUiApplicationPage(root, target) &&
+            (contentType == 'text/html' ||
+                contentType == 'application/xhtml+xml') &&
+            !disposition.toLowerCase().startsWith('attachment');
+        if (isPage) {
+          return (
+            uri: target,
+            bytes: null,
+            contentType: contentType,
+            fileName: '',
+          );
+        }
+        final body = response.data;
+        if (body == null) {
+          throw const FormatException('Empty download response.');
+        }
+        if ((int.tryParse(
+                  response.headers.value(Headers.contentLengthHeader) ?? '',
+                ) ??
+                0) >
+            maxBytes) {
+          throw const FileContentTooLargeException();
+        }
+        final bytes = BytesBuilder(copy: false);
+        var length = 0;
+        final iterator = StreamIterator<List<int>>(body.stream);
+        try {
+          while (await _moveFileContentStreamOrCancel(iterator, token)) {
+            length += iterator.current.length;
+            if (length > maxBytes) throw const FileContentTooLargeException();
+            bytes.add(iterator.current);
+          }
+        } finally {
+          _cancelFileContentStreamIterator(iterator);
+        }
+        var name = target.pathSegments.lastOrNull ?? 'download';
+        final encoded = RegExp(
+          r"filename\*\s*=\s*UTF-8''([^;]+)",
+          caseSensitive: false,
+        ).firstMatch(disposition)?.group(1);
+        final plain = RegExp(
+          r'filename\s*=\s*(?:"([^"]*)"|([^;]+))',
+          caseSensitive: false,
+        ).firstMatch(disposition);
+        if (encoded != null) {
+          try {
+            name = Uri.decodeComponent(encoded);
+          } on FormatException {
+            /* Use the URL name. */
+          }
+        } else if (plain != null) {
+          name = (plain.group(1) ?? plain.group(2)!).trim();
+        }
+        return (
+          uri: target,
+          bytes: bytes.takeBytes(),
+          contentType: contentType,
+          fileName: name,
+        );
+      } finally {
+        token.cancel('Server link response released.');
+        cancellation.detach();
+      }
+    }
+    throw const FormatException('Too many redirects.');
+  }
+
   // Files
   Future<String> getFileContent(
     String fileId, {

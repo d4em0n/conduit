@@ -29,6 +29,7 @@ import 'package:conduit_core/features/mcp_apps/mcp_app_resource_cache.dart';
 import 'package:conduit_core/features/mcp_apps/openwebui_mcp_app.dart';
 import 'package:conduit_core/providers/app_providers.dart';
 import 'package:conduit_core/utils/debug_logger.dart';
+import 'package:conduit/shared/widgets/authenticated_webui_page.dart';
 
 const double _initialHeight = 300;
 const double _minHeight = 100;
@@ -363,6 +364,12 @@ class _McpAppEmbedState extends ConsumerState<McpAppEmbed> {
       confirmText: l10n.mcpAppOpenLinkConfirm,
     );
     if (!allowed) return false;
+    return _openLink(url);
+  }
+
+  Future<bool> _openLink(Uri url) async {
+    if (await openAuthenticatedWebUiLink(context, url.toString())) return true;
+    if (!mounted) return false;
     return launchExternalLink(url.toString(), scope: 'mcp-app');
   }
 
@@ -560,7 +567,7 @@ class _McpAppEmbedState extends ConsumerState<McpAppEmbed> {
           if (url != null &&
               tapped &&
               parseAllowedExternalLink(url.toString()) != null) {
-            unawaited(launchExternalLink(url.toString(), scope: 'mcp-app'));
+            unawaited(_openLink(url));
           }
           return NavigationActionPolicy.CANCEL;
         }

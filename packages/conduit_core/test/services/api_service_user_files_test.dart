@@ -10,6 +10,157 @@ import 'package:dio/dio.dart';
 import 'package:test/test.dart';
 
 void main() {
+  group('ApiService.getWebUiLink', () {
+    test(
+      'application HTML opens as a page, API HTML remains a download',
+      () async {
+        final adapter = _WebUiLinkAdapter(
+          (_) => ResponseBody.fromString(
+            '<html>Untrusted when served through the Files API</html>',
+            200,
+            headers: {
+              Headers.contentTypeHeader: ['text/html'],
+            },
+          ),
+        );
+        final api = _buildAuthenticatedApiService(
+          adapter,
+          authToken: 'owner-a',
+          url: 'https://example.com',
+        );
+        final auth = api.captureAuthSnapshot();
+        final page = await api.getWebUiLink(
+          Uri.parse('https://example.com/viewer'),
+          authSnapshot: auth,
+        );
+        expect(page.bytes, isNull);
+        final file = await api.getWebUiLink(
+          Uri.parse('https://example.com/api/v1/files/demo/content/html'),
+          authSnapshot: auth,
+        );
+        expect(utf8.decode(file.bytes!), contains('Untrusted'));
+        expect(
+          adapter.requests.every(
+            (r) => r.headers['Authorization'] == 'Bearer owner-a',
+          ),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'downloads original bytes and decodes server-provided filenames',
+      () async {
+        final adapter = _WebUiLinkAdapter(
+          (_) => ResponseBody.fromBytes(
+            [1, 2, 3],
+            200,
+            headers: {
+              Headers.contentTypeHeader: ['application/pdf'],
+              'content-disposition': [
+                "attachment; filename*=UTF-8''Synthetic%20file.pdf",
+              ],
+            },
+          ),
+        );
+        final api = _buildAuthenticatedApiService(
+          adapter,
+          authToken: 'owner-a',
+          url: 'https://example.com',
+        );
+        final result = await api.getWebUiLink(
+          Uri.parse('https://example.com/api/v1/files/demo/content'),
+          authSnapshot: api.captureAuthSnapshot(),
+        );
+        expect(result.bytes, [1, 2, 3]);
+        expect(result.fileName, 'Synthetic file.pdf');
+        expect(result.contentType, 'application/pdf');
+      },
+    );
+
+    test(
+      'follows local redirects but never sends credentials to another origin',
+      () async {
+        final adapter = _WebUiLinkAdapter(
+          (r) => r.uri.path == '/start'
+              ? ResponseBody.fromString(
+                  '',
+                  302,
+                  headers: {
+                    'location': ['/file'],
+                  },
+                )
+              : ResponseBody.fromString(
+                  '',
+                  302,
+                  headers: {
+                    'location': ['https://other.example/private'],
+                  },
+                ),
+        );
+        final api = _buildAuthenticatedApiService(
+          adapter,
+          authToken: 'owner-a',
+          url: 'https://example.com',
+        );
+        await expectLater(
+          api.getWebUiLink(
+            Uri.parse('https://example.com/start'),
+            authSnapshot: api.captureAuthSnapshot(),
+          ),
+          throwsFormatException,
+        );
+        expect(adapter.requests.map((r) => r.uri.path), ['/start', '/file']);
+        expect(
+          adapter.requests.every((r) => r.uri.host == 'example.com'),
+          isTrue,
+        );
+      },
+    );
+
+    test('rejects stale ownership before any authenticated request', () async {
+      final adapter = _WebUiLinkAdapter(
+        (_) => ResponseBody.fromString('', 200),
+      );
+      final api = _buildAuthenticatedApiService(
+        adapter,
+        authToken: 'owner-a',
+        url: 'https://example.com',
+      );
+      final auth = api.captureAuthSnapshot();
+      api.updateAuthToken('owner-b');
+      await expectLater(
+        api.getWebUiLink(
+          Uri.parse('https://example.com/file'),
+          authSnapshot: auth,
+        ),
+        throwsA(isA<DioException>()),
+      );
+      expect(adapter.requests, isEmpty);
+    });
+
+    test(
+      'bounded streaming rejects downloads without trusting Content-Length',
+      () async {
+        final adapter = _WebUiLinkAdapter(
+          (_) => ResponseBody.fromBytes([1, 2, 3, 4], 200),
+        );
+        final api = _buildAuthenticatedApiService(
+          adapter,
+          authToken: 'owner-a',
+          url: 'https://example.com',
+        );
+        await expectLater(
+          api.getWebUiLink(
+            Uri.parse('https://example.com/file'),
+            maxBytes: 3,
+            authSnapshot: api.captureAuthSnapshot(),
+          ),
+          throwsA(isA<FileContentTooLargeException>()),
+        );
+      },
+    );
+  });
   group('ApiService.searchFilesForSession', () {
     test('distinguishes no matches from an unavailable endpoint', () async {
       final noMatchesApi = _buildApiService(
@@ -210,6 +361,24 @@ void main() {
       await adapter.sourceCancelled.future.timeout(const Duration(seconds: 1));
     });
   });
+}
+
+class _WebUiLinkAdapter implements HttpClientAdapter {
+  _WebUiLinkAdapter(this.response);
+  final ResponseBody Function(RequestOptions) response;
+  final requests = <RequestOptions>[];
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? stream,
+    Future<void>? cancelFuture,
+  ) async {
+    requests.add(options);
+    return response(options);
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 final class _AdversarialCancellationFileContentAdapter
@@ -436,13 +605,10 @@ ApiService _buildApiService(HttpClientAdapter adapter) {
 ApiService _buildAuthenticatedApiService(
   HttpClientAdapter adapter, {
   required String authToken,
+  String url = 'http://localhost:0',
 }) {
   final service = ApiService(
-    serverConfig: const ServerConfig(
-      id: 'test',
-      name: 'Test',
-      url: 'http://localhost:0',
-    ),
+    serverConfig: ServerConfig(id: 'test', name: 'Test', url: url),
     workerManager: WorkerManager(),
     authToken: authToken,
   );

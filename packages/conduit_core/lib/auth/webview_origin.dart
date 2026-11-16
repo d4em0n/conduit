@@ -3,6 +3,31 @@ import 'package:meta/meta.dart';
 /// A normalized HTTP(S) origin used to bind WebView credential reads.
 typedef NormalizedWebOrigin = ({String scheme, String host, int port});
 
+/// Server links may use the configured application's path, never a sibling app.
+bool isWebUiServerLink(Uri server, Uri target) {
+  if (server.userInfo.isNotEmpty ||
+      target.userInfo.isNotEmpty ||
+      !hasExactWebViewOrigin(target, server)) {
+    return false;
+  }
+  if (target.pathSegments.any(
+    (part) =>
+        part == '.' || part == '..' || part.contains(RegExp(r'[/\\\x00]')),
+  )) {
+    return false;
+  }
+  final prefix = server.path.replaceFirst(RegExp(r'/+$'), '');
+  return target.path == prefix || target.path.startsWith('$prefix/');
+}
+
+/// API responses can contain uploaded HTML, not trusted application code.
+bool isWebUiApplicationPage(Uri server, Uri target) {
+  if (!isWebUiServerLink(server, target)) return false;
+  final prefix = server.path.replaceFirst(RegExp(r'/+$'), '');
+  final path = target.path.substring(prefix.length);
+  return path != '/api' && !path.startsWith('/api/');
+}
+
 /// Returns the exact origin of an HTTP(S) URI, including its effective port.
 ///
 /// Explicit default ports normalize to the same origin as implicit ports.

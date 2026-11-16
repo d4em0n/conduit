@@ -2,6 +2,43 @@ import 'package:conduit_core/auth/webview_origin.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('authenticated links stay within the configured server application', () {
+    final root = Uri.parse('https://webui.example/team/');
+    for (final path in ['/team/', '/team/c/demo', '/team/viewer?file=demo']) {
+      expect(
+        isWebUiServerLink(root, Uri.parse('https://webui.example$path')),
+        isTrue,
+      );
+    }
+    for (final url in [
+      'https://other.example/team/viewer',
+      'http://webui.example/team/viewer',
+      'https://webui.example:444/team/viewer',
+      'https://user@webui.example/team/viewer',
+      'https://webui.example/teammate/viewer',
+      'https://webui.example/viewer',
+      'https://webui.example/team/%2fapi/v1/files/demo/content',
+      'https://webui.example/team/viewer%5cevil',
+    ]) {
+      expect(isWebUiServerLink(root, Uri.parse(url)), isFalse, reason: url);
+    }
+    for (final path in [
+      '/team/api/v1/files/demo/content/html',
+      '/team/api/v1/terminals/demo/files/view',
+    ]) {
+      expect(
+        isWebUiApplicationPage(root, Uri.parse('https://webui.example$path')),
+        isFalse,
+      );
+    }
+    expect(
+      isWebUiApplicationPage(
+        root,
+        Uri.parse('https://webui.example/team/viewer'),
+      ),
+      isTrue,
+    );
+  });
   group('webViewUrlHasExactServerOrigin', () {
     test('normalizes host case and implicit default HTTPS port', () {
       expect(

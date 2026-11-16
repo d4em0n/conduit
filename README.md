@@ -186,6 +186,7 @@ settings navigation. Sections you don't have permission for simply don't appear.
 | Area | What's included |
 | --- | --- |
 | Files and media | Uploads, re-attaching previously uploaded server files, multimodal prompts, clipboard image paste, audio attachments |
+| Server links | With standard WebUI authentication, server pages open in an authenticated in-app browser and file links use the device's save dialog. Links to other sites keep the normal browser behavior. |
 | Notes | Autosave, pinning, AI-generated titles, AI enhancement, audio recording, all available offline |
 | Channels | Threads and reactions, when your server enables them |
 | Voice | Voice input with on-device or server speech recognition, plus a full voice-call mode |
