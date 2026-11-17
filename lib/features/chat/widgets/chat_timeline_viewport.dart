@@ -13,7 +13,8 @@ import 'package:flutter/rendering.dart'
         RenderObject,
         RenderProxyBox,
         ScrollCacheExtent,
-        ScrollDirection;
+        ScrollDirection,
+        SliverMultiBoxAdaptorParentData;
 
 import 'package:conduit_core/database/models/chat_transcript_window.dart';
 
@@ -341,7 +342,7 @@ class ChatTimelineViewport extends StatefulWidget {
   static void preserveMcpAppScrollPosition(BuildContext context, double delta) {
     context
         .findAncestorStateOfType<_ChatTimelineViewportState>()
-        ?._preserveMcpAppScrollPosition(context, delta);
+        ?._preserveResizeScrollPosition(context, delta);
   }
 
   final ChatTimelineViewportController controller;
@@ -613,7 +614,8 @@ class _ChatTimelineViewportState extends State<ChatTimelineViewport>
     _setCenterMessageId(_resolveInitialCenter());
     _freeAnchor = null;
     if (_scrollController.hasClients) {
-      final position = _scrollController.position as _ChatTimelineScrollPosition;
+      final position =
+          _scrollController.position as _ChatTimelineScrollPosition;
       position.pendingMcpScrollOffset = null;
     }
     _pendingRecenter = null;
@@ -2159,34 +2161,58 @@ class _ChatTimelineViewportState extends State<ChatTimelineViewport>
   String _latestRecenterCenterId(double viewportDimension) {
     final count = _messageIds.length;
     var index = count - 1;
-    while (index > 0 &&
-        _extentBetween(index, count) < 2 * viewportDimension) {
+    while (index > 0 && _extentBetween(index, count) < 2 * viewportDimension) {
       index -= 1;
     }
     return _messageIds[index];
   }
 
-  void _preserveMcpAppScrollPosition(BuildContext context, double delta) {
+  void _preserveResizeScrollPosition(
+    BuildContext context,
+    double delta, {
+    double? previousRowHeight,
+  }) {
     if (!_initialPositionResolved ||
         !widget.maintainVisibleAnchor ||
         _programmaticNavigationActive) {
       return;
     }
-    final row = context.findAncestorWidgetOfExactType<_MountedTimelineRow>();
+    final row = context.widget is _MountedTimelineRow
+        ? context.widget as _MountedTimelineRow
+        : context.findAncestorWidgetOfExactType<_MountedTimelineRow>();
     final index = row == null ? null : _messageIndexById[row.messageId];
     final box = context.findRenderObject();
-    final viewport = _viewportRect;
     final position = _dimensionedPosition as _ChatTimelineScrollPosition?;
     if (index == null ||
         box is! RenderBox ||
         !box.hasSize ||
-        viewport == null ||
         position == null) {
       return;
     }
-    final above =
-        box.localToGlobal(Offset(0, box.size.height)).dy <=
-        viewport.top + widget.topContentInset;
+    final bool above;
+    if (previousRowHeight != null) {
+      if (index < _centerIndex) return;
+      // During layout, paint transforms and a newly inserted child's offset
+      // may not be ready. Use the forward sliver's existing layout coordinate.
+      RenderObject? child = box;
+      while (child != null &&
+          child.parentData is! SliverMultiBoxAdaptorParentData) {
+        child = child.parent;
+      }
+      final offset =
+          (child?.parentData as SliverMultiBoxAdaptorParentData?)?.layoutOffset;
+      if (offset == null || offset + previousRowHeight > position.pixels) {
+        return;
+      }
+      above = true;
+    } else {
+      final viewport = _viewportRect;
+      if (viewport == null) return;
+      final top = viewport.top + widget.topContentInset;
+      final rowBox = _renderBoxFor(_rowKeys[row!.messageId]!);
+      if (rowBox is _RenderTimelineRowLayout) rowBox.mcpHeightDelta += delta;
+      above = box.localToGlobal(Offset(0, box.size.height)).dy <= top;
+    }
     // The older sliver grows upwards; the center sliver grows downwards.
     // Preserve content below an app above the viewport, or above one below it.
     final correction =
@@ -2705,25 +2731,51 @@ class _MountedTimelineRowState extends State<_MountedTimelineRow> {
   }
 
   @override
-  Widget build(BuildContext context) => _TimelineRowLayout(child: widget.child);
+  Widget build(BuildContext context) => _TimelineRowLayout(
+    onResized: (previousHeight, delta) => context
+        .findAncestorStateOfType<_ChatTimelineViewportState>()
+        ?._preserveResizeScrollPosition(
+          context,
+          delta,
+          previousRowHeight: previousHeight,
+        ),
+    child: widget.child,
+  );
 }
 
 /// Makes a row's freshly laid-out extent available during viewport correction,
 /// when accessing another render object's size directly is not permitted.
 class _TimelineRowLayout extends SingleChildRenderObjectWidget {
-  const _TimelineRowLayout({required super.child});
+  const _TimelineRowLayout({required this.onResized, required super.child});
+
+  final void Function(double previousHeight, double delta) onResized;
 
   @override
   RenderObject createRenderObject(BuildContext context) =>
-      _RenderTimelineRowLayout();
+      _RenderTimelineRowLayout(onResized);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _RenderTimelineRowLayout renderObject,
+  ) => renderObject.onResized = onResized;
 }
 
 class _RenderTimelineRowLayout extends RenderProxyBox {
+  _RenderTimelineRowLayout(this.onResized);
+
+  void Function(double previousHeight, double delta) onResized;
   double extent = 0;
+  // App notifications already preserve their own changes before layout.
+  double mcpHeightDelta = 0;
 
   @override
   void performLayout() {
+    final previousHeight = extent;
     super.performLayout();
     extent = size.height;
+    final delta = extent - previousHeight - mcpHeightDelta;
+    mcpHeightDelta = 0;
+    if (previousHeight > 0 && delta != 0) onResized(previousHeight, delta);
   }
 }
